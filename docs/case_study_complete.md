@@ -2,8 +2,8 @@
 
 **Project Type**: AI-Powered Insurance CRM with Event-Driven Architecture
 **Developer**: Nicola Gnasso
-**Timeline**: October 22-29, 2025 (8 days)
-**Status**: Production-Ready with Auth, Dashboard & Commissions
+**Timeline**: October 22-30, 2025 (9 days)
+**Status**: Production-Ready with 8 Core Modules
 **GitHub**: https://github.com/Narjhan-ng/insurance-crm
 
 ---
@@ -1611,6 +1611,337 @@ Commissions now appear in:
 
 ---
 
+## 📄 Module 7: PDF Contract Generation (Oct 29)
+
+### Business Requirement
+Insurance policies require legal contracts:
+- **Customer deliverable**: Policy holder needs signed document
+- **Regulatory compliance**: Insurance contracts must be documented
+- **Broker tool**: Printable copy for in-person meetings
+- **Legal requirement**: Binding agreement with terms
+
+### Technical Implementation
+
+**PDF Generation with reportlab**:
+```python
+class PDFService:
+    @classmethod
+    def generate_policy_pdf(cls, policy: Policy) -> bytes:
+        # Create PDF document
+        doc = SimpleDocTemplate(buffer, pagesize=A4)
+        story = []
+
+        # Title and policy number
+        story.append(Paragraph("INSURANCE POLICY CONTRACT", title_style))
+        story.append(Paragraph(f"Policy Number: {policy.policy_number}", ...))
+
+        # Policy details table
+        policy_data = [
+            ["Policy Number:", policy.policy_number],
+            ["Annual Premium:", f"€{policy.quote.annual_premium:,.2f}"],
+            ...
+        ]
+        story.append(Table(policy_data, ...))
+
+        # Coverage information
+        # Terms and conditions
+        # Signature section
+
+        doc.build(story)
+        return pdf_bytes
+```
+
+**Event-Driven PDF Generation**:
+```python
+class PolicyPDFGenerationHandler(EventHandler):
+    async def handle(self, event_data):
+        policy = get_policy(event_data["policy_id"])
+
+        # Check idempotency
+        if policy.pdf_path:
+            return  # Already generated
+
+        # Generate PDF
+        pdf_path = PDFService.generate_and_save(policy)
+
+        # Update policy record
+        policy.pdf_path = pdf_path
+        db.commit()
+```
+
+**On-Demand Download Endpoint**:
+```python
+@router.get("/{policy_id}/pdf")
+async def download_policy_pdf(policy_id: int):
+    policy = get_policy(policy_id)
+
+    # If PDF exists, return file
+    if policy.pdf_path and os.path.exists(policy.pdf_path):
+        return FileResponse(policy.pdf_path, media_type="application/pdf")
+
+    # Otherwise, generate on-demand (fallback)
+    pdf_bytes = PDFService.generate_policy_pdf(policy)
+    return Response(content=pdf_bytes, media_type="application/pdf")
+```
+
+### PDF Structure
+
+**Professional Layout**:
+```
+┌─────────────────────────────────────┐
+│  INSURANCE POLICY CONTRACT          │
+│  Policy Number: POL-2025-000123     │
+├─────────────────────────────────────┤
+│  Policy Details Table:              │
+│  - Status, Dates, Premium           │
+├─────────────────────────────────────┤
+│  Insured Party:                     │
+│  - Name, Contact, Tax Code          │
+├─────────────────────────────────────┤
+│  Coverage Information:              │
+│  - Provider, Type, Amount           │
+├─────────────────────────────────────┤
+│  Terms and Conditions:              │
+│  - Coverage period                  │
+│  - Premium payment                  │
+│  - Claims process                   │
+│  - Cancellation policy              │
+├─────────────────────────────────────┤
+│  Signatures:                        │
+│  _____________  _____________       │
+│  Customer       Provider            │
+└─────────────────────────────────────┘
+```
+
+### Design Decisions
+
+**Why reportlab over alternatives:**
+
+| Alternative | Pros | Cons | Decision |
+|-------------|------|------|----------|
+| **reportlab** | ✅ Python-native<br>✅ Precise control<br>✅ Works in Docker | ❌ Verbose code | ✅ **CHOSEN** |
+| WeasyPrint | ✅ HTML → PDF<br>✅ Easy templates | ❌ CSS complexity<br>❌ Less control | ❌ |
+| wkhtmltopdf | ✅ HTML rendering | ❌ Binary dependency<br>❌ Not in Python | ❌ |
+| LaTeX | ✅ Perfect typography | ❌ Overkill<br>❌ Steep learning | ❌ |
+
+**Why on-demand generation fallback:**
+- If ARQ worker fails, user can still get PDF
+- API doesn't return 404 error
+- Better UX than "PDF not ready yet"
+- Trade-off: slightly slower first request
+
+**Storage Strategy**:
+```
+storage/policy_pdfs/
+├── POL-2025-000001.pdf
+├── POL-2025-000002.pdf
+└── POL-2025-000003.pdf
+```
+
+- Local filesystem for now
+- Easy to migrate to S3/Azure Blob later
+- PDF path stored in database (policy.pdf_path)
+
+### Code Stats
+- `pdf_service.py`: 346 lines (reportlab layout)
+- `policy_handlers.py` update: 74 lines
+- API endpoint: 71 lines
+- **Total**: ~480 lines, **1h 30min** development
+
+---
+
+## ✅ Module 8: Eligibility Check System (Oct 29)
+
+### Business Requirement
+Pre-qualify prospects before generating expensive AI quotes:
+- **Time savings**: Don't quote ineligible providers
+- **Cost savings**: Avoid unnecessary AI API calls
+- **Better UX**: Instant feedback on eligibility
+- **Higher conversion**: Focus on viable providers
+
+### Technical Implementation
+
+**Provider Rules Engine**:
+```python
+class EligibilityService:
+    PROVIDER_RULES = {
+        "generali": {
+            "life": {
+                "age_min": 18,
+                "age_max": 75,
+                "risk_categories": ["low", "medium"],
+                "base_premium_multiplier": Decimal("1.0"),
+                "coverage_max": Decimal("500000")
+            },
+            "auto": {...},
+            ...
+        },
+        "unipolsai": {...},
+        "allianz": {...},
+        "axa": {...}
+    }
+
+    @classmethod
+    def check_eligibility(cls, prospect, insurance_type):
+        results = []
+
+        for provider, rules in cls.PROVIDER_RULES.items():
+            type_rules = rules[insurance_type]
+
+            # Check age
+            if age < type_rules["age_min"]:
+                results.append(EligibilityProvider(
+                    provider=provider,
+                    is_eligible=False,
+                    reason=f"Age {age} below minimum"
+                ))
+                continue
+
+            # Check risk category
+            if risk not in type_rules["risk_categories"]:
+                results.append(EligibilityProvider(
+                    provider=provider,
+                    is_eligible=False,
+                    reason="Risk category not accepted"
+                ))
+                continue
+
+            # ELIGIBLE!
+            results.append(EligibilityProvider(
+                provider=provider,
+                is_eligible=True,
+                base_premium=estimated_premium
+            ))
+
+        return results
+```
+
+**API Endpoint**:
+```python
+@router.post("/check")
+async def check_eligibility(request: EligibilityCheckRequest):
+    prospect = get_prospect(request.prospect_id)
+
+    # Check all providers
+    results = EligibilityService.check_eligibility(
+        prospect, request.insurance_type
+    )
+
+    return {
+        "eligible_count": 2,
+        "ineligible_count": 2,
+        "providers": [
+            {"provider": "generali", "is_eligible": True, "base_premium": 760.00},
+            {"provider": "allianz", "is_eligible": True, "base_premium": 880.00},
+            {"provider": "axa", "is_eligible": False, "reason": "Age exceeds maximum 65"},
+            {"provider": "unipolsai", "is_eligible": False, "reason": "Age exceeds maximum 70"}
+        ],
+        "best_provider": "generali",
+        "lowest_premium": 760.00
+    }
+```
+
+### Business Example
+
+**Scenario**: Prospect age 72 wants life insurance
+
+**Eligibility Check**:
+```
+Generali Life:
+✅ ELIGIBLE (age limit: 75)
+   Base premium: €800 × 1.0 = €800
+
+Allianz Life:
+✅ ELIGIBLE (age limit: 80)
+   Base premium: €800 × 1.1 = €880
+
+AXA Life:
+❌ NOT ELIGIBLE
+   Reason: Age 72 exceeds maximum 65
+
+UnipolSai Life:
+❌ NOT ELIGIBLE
+   Reason: Age 72 exceeds maximum 70
+
+Result: Only quote Generali + Allianz
+Savings: 2 unnecessary AI quote generations avoided
+```
+
+### Provider Rules Matrix
+
+| Provider | Life Age | Auto Age | Health Age | Risk Categories |
+|----------|----------|----------|------------|-----------------|
+| Generali | 18-75 | 18+ | 0-85 | low, medium |
+| UnipolSai | 21-70 | 21+ | 18-80 | low only |
+| Allianz | 18-80 | 18+ | 0-75 | low, medium, high |
+| AXA | 20-65 | 23+ | 18-70 | low, medium |
+
+### Design Decisions
+
+**Why hardcoded rules vs database:**
+
+**Current (Hardcoded Dictionary)**:
+```python
+PROVIDER_RULES = {
+    "generali": {...}
+}
+```
+- ✅ Fast (no DB query)
+- ✅ Simple to deploy
+- ✅ Version controlled (in code)
+- ❌ Requires code change to update
+
+**Future (Database)**:
+```sql
+CREATE TABLE provider_rules (
+    provider VARCHAR(50),
+    insurance_type VARCHAR(20),
+    age_min INT,
+    age_max INT,
+    ...
+)
+```
+- ✅ Admin can update without deploy
+- ✅ Rules auditable
+- ❌ Requires migration
+- ❌ Slower (DB query)
+
+**Decision**: Start hardcoded, migrate to DB when rules change frequently.
+
+**Why pre-check before AI quotes:**
+```
+WITHOUT eligibility check:
+  Generate 4 AI quotes → 12 seconds, 4 API calls
+  → Customer sees 2 eligible + 2 "not eligible" results
+  → Wasted 6 seconds + 2 API calls
+
+WITH eligibility check:
+  Eligibility check → <100ms
+  Generate 2 AI quotes → 6 seconds, 2 API calls
+  → Customer sees 2 eligible results only
+  → Saved 6 seconds + 2 API calls + better UX
+```
+
+### Telco Domain Mapping
+
+**This is "Coverage Check" from Telco CRM**:
+
+| Telco Concept | Insurance Equivalent |
+|---------------|---------------------|
+| Check if ISP provides service at address | Check if insurer accepts prospect |
+| TIM/Fastweb/OpenFiber/NHM (4 providers) | Generali/Allianz/AXA/UnipolSai (4 providers) |
+| FTTH/FTTC/ADSL technology availability | Life/Auto/Home/Health product availability |
+| Distance from exchange → speed limit | Age/risk → premium estimate |
+
+**Same architectural pattern**, different business domain.
+
+### Code Stats
+- `eligibility_service.py`: 377 lines (rules for 4 providers × 4 types)
+- `eligibility.py` API: 227 lines (3 endpoints)
+- **Total**: ~612 lines, **1h 30min** development
+
+---
+
 ## 📝 Conclusion
 
 **What was built:**
@@ -1621,8 +1952,10 @@ FastAPI, LangChain, Claude 3.5 Sonnet, Redis Streams, ARQ, SQLAlchemy, Pydantic
 
 **Core features:**
 - Prospect management with event publishing
+- Eligibility pre-qualification (4 providers, instant)
 - AI-powered quote generation (4 providers, 3 seconds)
 - Policy creation with async processing
+- PDF contract generation (reportlab, on-demand)
 - JWT authentication with role-based access control
 - Role-specific dashboard with KPIs
 - Multi-tier commission calculation (broker/manager/affiliate)
@@ -1641,16 +1974,18 @@ FastAPI, LangChain, Claude 3.5 Sonnet, Redis Streams, ARQ, SQLAlchemy, Pydantic
 - Domain knowledge (insurance business logic)
 - Documented technical decisions with trade-offs
 
-**Recently Added (Oct 27-29):**
+**Recently Added (Oct 27-30):**
 - ✅ Authentication system (JWT + RBAC)
 - ✅ Role-based dashboard with KPIs
 - ✅ Multi-tier commission calculation
+- ✅ PDF contract generation (reportlab)
+- ✅ Eligibility check (pre-qualification)
 
 **Next steps:**
-- PDF generation (reportlab)
 - Reports module (sales/commission reports)
-- Eligibility check enhancement
+- Advisory Services module
 - Frontend (Next.js + shadcn/ui)
+- Product catalog management
 - Database migrations (Alembic)
 
 ---
