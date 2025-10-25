@@ -12,6 +12,12 @@ class Settings(BaseSettings):
     DATABASE_URL: str
     DATABASE_TEST_URL: str | None = None
 
+    # Redis
+    REDIS_URL: str = "redis://localhost:6379/0"
+    REDIS_HOST: str = "localhost"
+    REDIS_PORT: int = 6379
+    REDIS_DB: int = 0
+
     # API Keys
     OPENAI_API_KEY: str
     ANTHROPIC_API_KEY: str
