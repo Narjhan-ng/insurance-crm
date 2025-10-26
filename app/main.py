@@ -136,7 +136,7 @@ async def health_check():
 
 
 # Import and include API routers
-from app.api.v1 import prospects
+from app.api.v1 import prospects, quotes
 
 app.include_router(
     prospects.router,
@@ -144,9 +144,14 @@ app.include_router(
     tags=["Prospects"]
 )
 
+app.include_router(
+    quotes.router,
+    prefix="/api/v1/quotes",
+    tags=["Quotes"]
+)
+
 # TODO: Add more routers as they are created
-# from app.api.v1 import quotes, policies
-# app.include_router(quotes.router, prefix="/api/v1/quotes", tags=["Quotes"])
+# from app.api.v1 import policies
 # app.include_router(policies.router, prefix="/api/v1/policies", tags=["Policies"])
 
 
