@@ -68,6 +68,7 @@ class Quote(Base):
 
     # Relationships
     prospect = relationship("Prospect", back_populates="quotes")
+    policy = relationship("Policy", back_populates="quote", uselist=False)
 
     def __repr__(self):
         return f"<Quote {self.provider} for Prospect {self.prospect_id} - €{self.monthly_premium}/month>"

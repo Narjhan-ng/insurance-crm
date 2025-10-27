@@ -24,6 +24,13 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+# Import policy handlers
+from app.handlers.policy_handlers import (
+    PolicyCreationHandler,
+    PolicyPDFGenerationHandler,
+    PolicyEmailNotificationHandler,
+)
+
 # Handler registry - maps event types to handlers
 EVENT_HANDLERS = {
     "ProspectCreated": [
@@ -31,9 +38,14 @@ EVENT_HANDLERS = {
         NotifyBrokerHandler(),
         SendWelcomeEmailHandler(),
     ],
-    # Add more event types as needed
-    # "QuoteGenerated": [QuoteEmailHandler(), ...],
-    # "PolicySigned": [PolicyPDFHandler(), CommissionCalculator(), ...],
+    "QuoteAccepted": [
+        PolicyCreationHandler(),  # Creates policy from accepted quote
+    ],
+    "PolicyCreated": [
+        PolicyPDFGenerationHandler(),  # Generate PDF contract
+        PolicyEmailNotificationHandler(),  # Send confirmation email
+        # TODO: Add CommissionCalculator when implemented
+    ],
 }
 
 
