@@ -11,12 +11,13 @@ from datetime import date, timedelta
 from app.api.dependencies import get_db_session
 from app.models.quote import Quote, QuoteStatus
 from app.models.prospect import Prospect
-from app.services.ai_quote_service import (
-    AIQuoteService,
-    EligibilityService,
-    ProspectProfile,
-    QuoteRecommendation
-)
+# Temporarily disabled due to LangChain dependency conflicts
+# from app.services.ai_quote_service import (
+#     AIQuoteService,
+#     EligibilityService,
+#     ProspectProfile,
+#     QuoteRecommendation
+# )
 
 router = APIRouter()
 

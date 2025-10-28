@@ -115,8 +115,9 @@ async def health_check():
     # Check database
     try:
         from app.core.database import SessionLocal
+        from sqlalchemy import text
         db = SessionLocal()
-        db.execute("SELECT 1")
+        db.execute(text("SELECT 1"))
         db.close()
         health_status["database"] = "connected"
     except Exception as e:
@@ -136,7 +137,7 @@ async def health_check():
 
 
 # Import and include API routers
-from app.api.v1 import auth, dashboard, prospects, quotes, policies, eligibility, reports
+from app.api.v1 import auth, dashboard, prospects, policies, eligibility, reports  # quotes temporarily disabled
 
 # Authentication router (no authentication required for login/register)
 app.include_router(
@@ -165,11 +166,12 @@ app.include_router(
     tags=["Eligibility"]
 )
 
-app.include_router(
-    quotes.router,
-    prefix="/api/v1/quotes",
-    tags=["Quotes"]
-)
+# Quotes temporarily disabled due to LangChain dependency conflicts
+# app.include_router(
+#     quotes.router,
+#     prefix="/api/v1/quotes",
+#     tags=["Quotes"]
+# )
 
 app.include_router(
     policies.router,

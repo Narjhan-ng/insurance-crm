@@ -19,8 +19,9 @@ class Settings(BaseSettings):
     REDIS_DB: int = 0
 
     # API Keys
-    OPENAI_API_KEY: str
-    ANTHROPIC_API_KEY: str
+    OPENAI_API_KEY: str = "sk-placeholder"
+    ANTHROPIC_API_KEY: str = "sk-placeholder"
+    GROQ_API_KEY: str | None = None
 
     # Security
     SECRET_KEY: str

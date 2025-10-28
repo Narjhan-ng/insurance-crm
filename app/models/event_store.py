@@ -21,7 +21,7 @@ class EventStore(Base):
 
     # Event data and metadata
     data = Column(JSON, nullable=False)
-    metadata = Column(JSON, nullable=True)
+    event_metadata = Column(JSON, nullable=True)
 
     # Tracking
     user_id = Column(Integer, nullable=True, index=True)
