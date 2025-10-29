@@ -315,3 +315,74 @@ def list_policies(
         )
         for p in policies
     ]
+
+
+@router.get("/{policy_id}/pdf")
+async def download_policy_pdf(
+    policy_id: int,
+    db: Session = Depends(get_db_session)
+):
+    """
+    Download policy contract PDF.
+
+    FLOW:
+    1. Fetch policy from database
+    2. Check if PDF exists (pdf_path is set)
+    3. If exists, return PDF file
+    4. If not exists, generate on-demand and return
+
+    WHY on-demand generation:
+    - Handles case where PDF wasn't generated yet
+    - Fallback if background worker failed
+    - Better UX than 404 error
+
+    SECURITY:
+    - TODO: Add authentication
+    - TODO: Check user has permission to view this policy
+    - TODO: Rate limiting to prevent abuse
+
+    Args:
+        policy_id: Policy ID
+        db: Database session
+
+    Returns:
+        PDF file as downloadable response
+    """
+    from fastapi.responses import FileResponse, Response
+    from app.services.pdf_service import PDFService
+    import os
+
+    # Fetch policy
+    policy = db.query(Policy).filter(Policy.id == policy_id).first()
+
+    if not policy:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Policy with id {policy_id} not found"
+        )
+
+    # Check if PDF exists on filesystem
+    if policy.pdf_path and os.path.exists(policy.pdf_path):
+        # Return existing PDF file
+        return FileResponse(
+            path=policy.pdf_path,
+            media_type="application/pdf",
+            filename=f"{policy.policy_number}.pdf"
+        )
+    else:
+        # Generate PDF on-demand
+        pdf_bytes = PDFService.generate_policy_pdf(policy)
+
+        # Optionally save for future use
+        pdf_path = PDFService.save_policy_pdf(policy, pdf_bytes)
+        policy.pdf_path = pdf_path
+        db.commit()
+
+        # Return PDF as response
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f"attachment; filename={policy.policy_number}.pdf"
+            }
+        )

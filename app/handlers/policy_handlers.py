@@ -139,10 +139,22 @@ class PolicyPDFGenerationHandler(EventHandler):
 
     IMPLEMENTATION:
     - Uses reportlab to generate PDF
-    - Stores in filesystem or S3
+    - Stores in filesystem
     - Updates policy.pdf_path in database
 
-    CURRENT: Placeholder (TODO implement with reportlab)
+    FLOW:
+    1. PolicyCreated event published
+    2. This handler catches event
+    3. Fetch policy with related data (quote, prospect)
+    4. Generate PDF using PDFService
+    5. Save PDF to storage
+    6. Update policy.pdf_path in database
+    7. Log success/failure
+
+    WHY async in handler:
+    - PDF generation is I/O bound (file writes)
+    - Can run in background without blocking
+    - If fails, ARQ will retry automatically
     """
 
     async def handle(self, event_data: Dict[str, Any]) -> None:
@@ -152,16 +164,56 @@ class PolicyPDFGenerationHandler(EventHandler):
 
         logger.info(f"PolicyPDFGenerationHandler: Generating PDF for policy {policy_number}")
 
-        # TODO: Implement PDF generation with reportlab
-        # For now, just log
-        logger.info(f"📄 PDF generation for policy {policy_number} - PLACEHOLDER")
+        try:
+            # Import here to avoid circular dependencies
+            from app.core.database import SessionLocal
+            from app.models.policy import Policy
+            from app.services.pdf_service import PDFService
 
-        # In real implementation:
-        # 1. Fetch policy details from database
-        # 2. Generate PDF with reportlab
-        # 3. Save to filesystem/S3
-        # 4. Update policy.pdf_path
-        # 5. Maybe publish PolicyPDFGenerated event
+            db = SessionLocal()
+
+            try:
+                # Fetch policy with all related data
+                policy = db.query(Policy).filter(Policy.id == policy_id).first()
+
+                if not policy:
+                    logger.error(f"Policy {policy_id} not found!")
+                    return
+
+                # Check if PDF already exists (idempotency)
+                if policy.pdf_path:
+                    logger.info(
+                        f"PDF already exists for policy {policy_number} at {policy.pdf_path}. "
+                        "Skipping generation (idempotent)."
+                    )
+                    return
+
+                # Generate and save PDF
+                pdf_path = PDFService.generate_and_save(policy)
+
+                # Update policy record with PDF path
+                policy.pdf_path = pdf_path
+                db.commit()
+
+                logger.info(
+                    f"✅ PDF generated successfully for policy {policy_number}: {pdf_path}"
+                )
+
+                # TODO: Publish PolicyPDFGenerated event
+                # This could trigger:
+                # - Email with PDF attachment
+                # - Notification to broker
+                # - Update dashboard
+
+            finally:
+                db.close()
+
+        except Exception as e:
+            logger.error(
+                f"❌ PolicyPDFGenerationHandler failed for policy {policy_number}: {e}",
+                exc_info=True
+            )
+            raise  # Re-raise to let ARQ retry
 
 
 class PolicyEmailNotificationHandler(EventHandler):
