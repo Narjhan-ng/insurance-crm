@@ -31,6 +31,11 @@ from app.handlers.policy_handlers import (
     PolicyEmailNotificationHandler,
 )
 
+# Import commission handlers
+from app.handlers.commission_handlers import (
+    CommissionCalculationHandler,
+)
+
 # Handler registry - maps event types to handlers
 EVENT_HANDLERS = {
     "ProspectCreated": [
@@ -44,7 +49,7 @@ EVENT_HANDLERS = {
     "PolicyCreated": [
         PolicyPDFGenerationHandler(),  # Generate PDF contract
         PolicyEmailNotificationHandler(),  # Send confirmation email
-        # TODO: Add CommissionCalculator when implemented
+        CommissionCalculationHandler(),  # Calculate broker/manager/affiliate commissions
     ],
 }
 

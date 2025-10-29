@@ -3,6 +3,7 @@ from app.models.prospect import Prospect
 from app.models.user import User
 from app.models.quote import Quote
 from app.models.policy import Policy
+from app.models.commission import Commission
 from app.models.event_store import EventStore
 
 __all__ = [
@@ -10,5 +11,6 @@ __all__ = [
     "User",
     "Quote",
     "Policy",
+    "Commission",
     "EventStore",
 ]
