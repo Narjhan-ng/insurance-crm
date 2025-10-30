@@ -38,6 +38,7 @@ class User(Base):
     commissions_broker = relationship("Commission", foreign_keys="Commission.broker_id", back_populates="broker")
     commissions_manager = relationship("Commission", foreign_keys="Commission.manager_id", back_populates="manager")
     commissions_affiliate = relationship("Commission", foreign_keys="Commission.affiliate_id", back_populates="affiliate")
+    reports = relationship("Report", back_populates="user")
 
     def __repr__(self):
         return f"<User {self.username} ({self.role})>"

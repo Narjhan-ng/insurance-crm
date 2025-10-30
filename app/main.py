@@ -136,7 +136,7 @@ async def health_check():
 
 
 # Import and include API routers
-from app.api.v1 import auth, dashboard, prospects, quotes, policies, eligibility
+from app.api.v1 import auth, dashboard, prospects, quotes, policies, eligibility, reports
 
 # Authentication router (no authentication required for login/register)
 app.include_router(
@@ -175,6 +175,12 @@ app.include_router(
     policies.router,
     prefix="/api/v1/policies",
     tags=["Policies"]
+)
+
+app.include_router(
+    reports.router,
+    prefix="/api/v1/reports",
+    tags=["Reports"]
 )
 
 
