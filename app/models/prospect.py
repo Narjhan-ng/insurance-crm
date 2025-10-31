@@ -56,7 +56,7 @@ class Prospect(Base):
     creator = relationship("User", foreign_keys=[created_by], back_populates="prospects_created")
     quotes = relationship("Quote", back_populates="prospect", cascade="all, delete-orphan")
     commissions = relationship("Commission", back_populates="prospect")
-    # advisory_offers = relationship("AdvisoryOffer", back_populates="prospect", cascade="all, delete-orphan")  # TODO: Uncomment when AdvisoryOffer model is implemented
+    advisory_offers = relationship("AdvisoryOffer", back_populates="prospect", cascade="all, delete-orphan")
 
     @property
     def full_name(self):

@@ -354,6 +354,197 @@ chain = (
 - **ChatPromptTemplate**: Structured prompt engineering
 - **PydanticOutputParser**: JSON schema enforcement
 - **LCEL (LangChain Expression Language)**: Chain composition with `|` operator
+- **LangGraph**: Multi-step workflows with conditional routing (see Advisory Service below)
+
+---
+
+### LangGraph Advisory Service Implementation
+
+**Problem with Simple Chains**: Initial quote service used a single AI call, which made it:
+- Difficult to debug (which part of reasoning failed?)
+- Impossible to add conditional logic (different paths for edge cases)
+- Hard to test individual steps
+- Opaque when failures occurred
+
+**Solution: LangGraph Multi-Step Workflow**
+
+```
+┌─────────────────┐
+│  START          │
+│  Input: prospect│
+└────────┬────────┘
+         ↓
+┌─────────────────────────┐
+│  Node 1: PROFILE        │
+│  - Extract age          │
+│  - Detect medical       │
+│    conditions (keywords)│
+│  - Assess risk level    │
+└────────┬────────────────┘
+         ↓
+┌─────────────────────────┐
+│  Node 2: ELIGIBILITY    │
+│  - Check 4 providers    │
+│  - Get base pricing     │
+└────────┬────────────────┘
+         │
+         ▼      ┌─────────────────┐
+         │      │ Conditional:    │
+         ├─────▶│ Has providers?  │
+         │      └────────┬────────┘
+         │               │
+         │          ╭────┴────╮
+         │      == 0│         │> 0
+         │          │         │
+         ▼          ▼         ▼
+┌─────────────┐  ┌──────────────────┐
+│  Node 3A:   │  │  Node 3B:        │
+│  NO_OPTIONS │  │  RISK_ANALYSIS   │
+│  AI explains│  │  AI analyzes     │
+│  why not    │  │  risk profile    │
+│  eligible   │  │  (structured)    │
+└─────────────┘  └────────┬─────────┘
+                          ↓
+                 ┌─────────────────────┐
+                 │  Node 4: RECOMMEND  │
+                 │  AI ranks providers │
+                 │  with pro/cons      │
+                 └──────────┬──────────┘
+                           ↓
+                 ┌─────────────────────┐
+                 │  Node 5: PERSONALIZE│
+                 │  Adapts message     │
+                 │  to prospect type   │
+                 └──────────┬──────────┘
+                           ↓
+                 ┌─────────────────────┐
+                 │  END                │
+                 │  Advisory complete  │
+                 └─────────────────────┘
+```
+
+**Key LangGraph Features Used:**
+
+**1. StateGraph with Typed State**
+```python
+class AdvisoryState(TypedDict):
+    # Input data
+    prospect_id: int
+    prospect: Prospect
+    insurance_type: str
+
+    # Node 1 output
+    age: int
+    risk_category: str
+    has_conditions: bool
+
+    # Node 2 output
+    eligible_providers: List[EligibilityProvider]
+    eligibility_count: int
+
+    # Node 3B output
+    risk_analysis: RiskAnalysis
+
+    # Node 4 output
+    advisory_recommendations: AdvisoryRecommendations
+
+    # Node 5 output
+    personalized_message: PersonalizedMessage
+
+    # Metadata
+    workflow_path: List[str]  # Tracks execution
+    stage: str
+```
+
+**2. Conditional Routing**
+```python
+def route_after_eligibility(state: AdvisoryState) -> str:
+    """Decide next node based on eligibility"""
+    if state["eligibility_count"] == 0:
+        return "no_options_handler"  # Show empathetic message
+    else:
+        return "risk_analyzer"  # Continue with AI analysis
+
+workflow.add_conditional_edges(
+    "eligibility_checker",
+    route_after_eligibility,
+    {
+        "no_options_handler": "no_options_handler",
+        "risk_analyzer": "risk_analyzer"
+    }
+)
+```
+
+**3. Individual Node Functions**
+```python
+def profile_extractor_node(state: AdvisoryState) -> AdvisoryState:
+    """Node 1: Pure Python, no AI - fast data extraction"""
+    prospect = state["prospect"]
+    age = calculate_age(prospect.birth_date)
+
+    # Detect medical conditions from notes
+    has_conditions = any(
+        keyword in prospect.notes.lower()
+        for keyword in ['diabete', 'ipertensione', 'asma', ...]
+    )
+
+    state["age"] = age
+    state["has_conditions"] = has_conditions
+    state["workflow_path"].append("profile_extractor")
+    return state
+
+def risk_analyzer_node(state: AdvisoryState) -> AdvisoryState:
+    """Node 3B: AI call with structured output"""
+    llm = ChatAnthropic(model="claude-3-5-sonnet", temperature=0.3)
+    parser = PydanticOutputParser(pydantic_object=RiskAnalysis)
+
+    prompt = ChatPromptTemplate.from_template("""
+    Analyze this prospect's risk:
+    Age: {age}, Conditions: {has_conditions}
+    {format_instructions}
+    """)
+
+    chain = prompt | llm | parser
+    risk_analysis = chain.invoke({...})
+
+    state["risk_analysis"] = risk_analysis
+    state["workflow_path"].append("risk_analyzer")
+    return state
+```
+
+**4. Structured AI Outputs with Pydantic**
+```python
+class RiskAnalysis(BaseModel):
+    risk_score: float = Field(description="0-100")
+    risk_factors: List[str]
+    mitigation_suggestions: List[str]
+    overall_assessment: str
+
+class ProviderRecommendation(BaseModel):
+    provider: str
+    rank: int
+    score: float
+    pros: List[str]
+    cons: List[str]
+    reasoning: str
+```
+
+**Benefits Realized:**
+
+| Aspect | Simple Chain | LangGraph Workflow |
+|--------|-------------|-------------------|
+| **Debugging** | Opaque (which step failed?) | Clear (workflow_path shows exact node) |
+| **Conditional Logic** | Not possible | Easy (route based on state) |
+| **Testing** | Must mock entire chain | Test nodes individually |
+| **Observability** | Single black box | Each node tracked separately |
+| **Extensibility** | Modify chain = retest all | Add nodes without touching existing |
+| **Temperature Tuning** | One temp for all | Different per node (0.3 analysis, 0.7 personalization) |
+
+**Real-World Impact:**
+- **Faster Debugging**: `workflow_path: ["profile", "eligibility", "risk_analyzer"]` shows exactly where failure occurred
+- **Better UX**: Different message for "no providers" vs "here are options"
+- **Easier A/B Testing**: Swap out individual nodes (e.g., test different personalization strategies)
+- **Production Ready**: Each node has error handling, can retry independently
 
 ---
 

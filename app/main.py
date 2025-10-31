@@ -10,6 +10,11 @@ import logging
 from app.core.database import engine, Base
 from app.core.redis_client import get_redis
 
+# Import all models to ensure they're registered with SQLAlchemy
+from app.models import (
+    User, Prospect, Quote, Policy, Commission, EventStore, AdvisoryOffer
+)
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -137,7 +142,7 @@ async def health_check():
 
 
 # Import and include API routers
-from app.api.v1 import auth, dashboard, prospects, policies, eligibility, reports  # quotes temporarily disabled
+from app.api.v1 import auth, dashboard, prospects, policies, eligibility, reports, advisory  # quotes temporarily disabled
 
 # Authentication router (no authentication required for login/register)
 app.include_router(
@@ -164,6 +169,13 @@ app.include_router(
     eligibility.router,
     prefix="/api/v1/eligibility",
     tags=["Eligibility"]
+)
+
+# Advisory router - AI-powered recommendations with LangGraph
+app.include_router(
+    advisory.router,
+    prefix="/api/v1/advisory",
+    tags=["Advisory"]
 )
 
 # Quotes temporarily disabled due to LangChain dependency conflicts
