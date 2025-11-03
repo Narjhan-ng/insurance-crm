@@ -157,6 +157,7 @@ def profile_extractor_node(state: AdvisoryState) -> AdvisoryState:
         notes_lower = prospect.notes.lower()
         has_conditions = any(keyword in notes_lower for keyword in medical_keywords)
 
+
     # Also consider high risk category as indicator
     if prospect.risk_category == RiskCategory.HIGH:
         has_conditions = True
