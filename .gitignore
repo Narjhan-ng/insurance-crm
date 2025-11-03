@@ -54,7 +54,7 @@ logs/
 *.sqlite3
 
 # Documentation (work in progress)
-.docs/
+docs/
 
 # Redis dumps
 dump.rdb
