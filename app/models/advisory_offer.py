@@ -1,11 +1,15 @@
 """
 AdvisoryOffer model - AI-generated insurance advisory recommendations
 """
+from typing import TYPE_CHECKING
 from sqlalchemy import Column, Integer, String, Numeric, Enum, DateTime, ForeignKey, JSON, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.core.database import Base
 import enum
+
+if TYPE_CHECKING:
+    from app.models.prospect import Prospect
 
 
 class AdvisoryStatus(str, enum.Enum):

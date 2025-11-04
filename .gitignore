@@ -66,3 +66,41 @@ Thumbs.db
 # Project specific
 alembic/versions/*.py
 !alembic/versions/__init__.py
+
+# ============================================================================
+# Frontend (Next.js)
+# ============================================================================
+
+# Dependencies
+insurance-crm-frontend/node_modules/
+insurance-crm-frontend/.pnp
+insurance-crm-frontend/.pnp.js
+
+# Testing
+insurance-crm-frontend/coverage/
+
+# Next.js build output
+insurance-crm-frontend/.next/
+insurance-crm-frontend/out/
+
+# Production build
+insurance-crm-frontend/build/
+
+# Vercel deployment
+insurance-crm-frontend/.vercel
+
+# TypeScript
+insurance-crm-frontend/*.tsbuildinfo
+insurance-crm-frontend/next-env.d.ts
+
+# Debug logs
+insurance-crm-frontend/npm-debug.log*
+insurance-crm-frontend/yarn-debug.log*
+insurance-crm-frontend/yarn-error.log*
+
+# Local env files
+insurance-crm-frontend/.env*.local
+insurance-crm-frontend/.env.local
+insurance-crm-frontend/.env.development.local
+insurance-crm-frontend/.env.test.local
+insurance-crm-frontend/.env.production.local
