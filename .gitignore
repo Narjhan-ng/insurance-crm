@@ -72,35 +72,36 @@ alembic/versions/*.py
 # ============================================================================
 
 # Dependencies
-insurance-crm-frontend/node_modules/
-insurance-crm-frontend/.pnp
-insurance-crm-frontend/.pnp.js
+**/node_modules/
+**/.pnp
+**/.pnp.js
+**/package-lock.json
 
 # Testing
-insurance-crm-frontend/coverage/
+**/coverage/
 
 # Next.js build output
-insurance-crm-frontend/.next/
-insurance-crm-frontend/out/
+**/.next/
+**/out/
 
 # Production build
-insurance-crm-frontend/build/
+**/build/
 
 # Vercel deployment
-insurance-crm-frontend/.vercel
+**/.vercel
 
 # TypeScript
-insurance-crm-frontend/*.tsbuildinfo
-insurance-crm-frontend/next-env.d.ts
+**/*.tsbuildinfo
+next-env.d.ts
 
 # Debug logs
-insurance-crm-frontend/npm-debug.log*
-insurance-crm-frontend/yarn-debug.log*
-insurance-crm-frontend/yarn-error.log*
+**/npm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
 
 # Local env files
-insurance-crm-frontend/.env*.local
-insurance-crm-frontend/.env.local
-insurance-crm-frontend/.env.development.local
-insurance-crm-frontend/.env.test.local
-insurance-crm-frontend/.env.production.local
+**/.env*.local
+**/.env.local
+**/.env.development.local
+**/.env.test.local
+**/.env.production.local
